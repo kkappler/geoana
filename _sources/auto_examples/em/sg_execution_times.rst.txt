@@ -1,0 +1,17 @@
+
+:orphan:
+
+.. _sphx_glr_auto_examples_em_sg_execution_times:
+
+
+Computation times
+=================
+**00:05.698** total execution time for **auto_examples_em** files:
+
++----------------------------------------------------------------------------------------------------------------------------------------+-----------+--------+
+| :ref:`sphx_glr_auto_examples_em_plot_fdem_ElectricDipoleWholeSpace.py` (``plot_fdem_ElectricDipoleWholeSpace.py``)                     | 00:04.345 | 0.0 MB |
++----------------------------------------------------------------------------------------------------------------------------------------+-----------+--------+
+| :ref:`sphx_glr_auto_examples_em_plot_static_vector_potentials.py` (``plot_static_vector_potentials.py``)                               | 00:01.060 | 0.0 MB |
++----------------------------------------------------------------------------------------------------------------------------------------+-----------+--------+
+| :ref:`sphx_glr_auto_examples_em_plot_static_magnetic_fields_from_pole_source.py` (``plot_static_magnetic_fields_from_pole_source.py``) | 00:00.292 | 0.0 MB |
++----------------------------------------------------------------------------------------------------------------------------------------+-----------+--------+
