@@ -16,11 +16,13 @@ from geoana import utils
 from geoana.em import static
 from loguru import logger
 from matplotlib.colors import LogNorm
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from typing import Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pathlib
 
 matplotlib.use('TkAgg')
 
@@ -276,7 +278,7 @@ class GridParameters():
     def make_grid(self):
         x = self.x_nodes
         y = self.y_nodes
-        xyz = utils.ndgrid([x, y, np.r_[1.]])
+        xyz = utils.ndgrid([x, y, np.r_[-1.]])
         logger.debug("WARNING: Check out hardcoded z=1.0 in make_grid ")
         return xyz
 
@@ -313,8 +315,8 @@ class DipoleField():
         self._b_total = self.dipole.dot_orientation(self.b_vec)
         return
 
-    def plot_total_field(self):
-        fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    def plot_total_field_amplitude(self, savefig_path=None):
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         # plot dipole vector potential
         # _plot_amplitude(ax[0], self.b_total)
         _plot_amplitude(
@@ -323,8 +325,10 @@ class DipoleField():
             self.params.grid_parameters.x_nodes,
             self.params.grid_parameters.y_nodes,
         )
-        ax.set_title("Total field: dipole")
+
         #ax[0].set_title("Total field: dipole")
+        if savefig_path:
+            plt.savefig(savefig_path)
         plt.show()
 
 def _plot_amplitude(ax, v, x, y):
@@ -336,14 +340,26 @@ def _plot_amplitude(ax, v, x, y):
     :param v:
     :return:
     """
-    plt.colorbar(
-        ax.pcolormesh(
+    pcm = ax.pcolormesh(
             x, y, v.reshape(len(x), len(y), order='F')
-        ), ax=ax
+        )
+    plt.colorbar(
+        pcm,
+        ax=ax,
+        pad=0.05,
+        fraction=0.046
+        # cax=inset_axes(ax, width="5%", height="90%", loc="right")
     )
+    # https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
     ax.axis('square')
     ax.set_xlabel('y (east,  m)')
     ax.set_ylabel('x (north,  m)')
+    ax.set_title("Total field: dipole")
+    # ax[1].set_title("Total field: pole")
+
+    # format so text doesn't overlap
+    plt.tight_layout()
+
 
 def test_grid_parameters():
     """
@@ -389,7 +405,7 @@ def test_reference_dipole():
     params = test_experiment_params()
     dipole = DipoleField(experiment_parameters=params)
     dipole.compute_field()
-    dipole.plot_total_field()
+    dipole.plot_total_field_amplitude(savefig_path="test.png")
 
 def main():
     test_target()
