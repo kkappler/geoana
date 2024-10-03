@@ -315,7 +315,11 @@ class DipoleField():
         self._b_total = self.dipole.dot_orientation(self.b_vec)
         return
 
-    def plot_total_field_amplitude(self, savefig_path=None):
+    def plot_total_field_amplitude(
+            self,
+            savefig_path=None,
+            transects=None
+    ):
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         # plot dipole vector potential
         # _plot_amplitude(ax[0], self.b_total)
@@ -325,11 +329,59 @@ class DipoleField():
             self.params.grid_parameters.x_nodes,
             self.params.grid_parameters.y_nodes,
         )
+        colors = ["blue", "orange", "green", "red", "purple", "pink", "brown"]
+        if transects is not None:
+            logger.error("TODO: Add transect overlays")
+            try:
+                y_transects = transects["y"]
+            except KeyError:
+                msg = "no y transects found"
+                y_transects = None
+            xlim = ax.get_xlim()
+            for y_transect in y_transects:
+                ax.plot(
+                    np.asarray([xlim[0], xlim[1]]),
+                    np.asarray([y_transect, y_transect]),
+                    label=f"{y_transect:.2f}",
+                    linewidth=2,
+                )
 
+                #plt.hlines(y_transects, xlim[0], xlim[1], colors=colors, linestyles= )
         #ax[0].set_title("Total field: dipole")
+        plt.legend()
         if savefig_path:
             plt.savefig(savefig_path)
         plt.show()
+
+    def plot_transects(self, x=None, y_indices=None):
+        """
+        Tool intended to make a pair of plots.
+        1. total field amplitude (with some transects over it)
+        2. the field values at the transects
+
+        :param x:
+        :param y:
+        :return:
+        """
+        fig, ax  = plt.subplots(figsize=(8, 8))
+        # fig, ax = plt.subplots(figsize=(8, 6))
+        for y_ind in y_indices:
+            ax.plot(self.params.grid_parameters.x_nodes,
+                    self.b_total[y_ind * 100: (y_ind + 1) * 100],
+                    label=f"{self.params.grid_parameters.y_nodes[y_ind]:.1f}m"
+                    )
+        #for n in [0, 7, 13, 23, 33, 43, 44]:
+        #     print(x[n], y[n])
+        #     ax.plot(y[0:100], b_total_dipole[n * 100: (n + 1) * 100], label=f"{x[n]:.1f}m")
+        # 
+        fig.suptitle("Typical traces of Total Magnetic Field Intensity as a target passes")
+        fig.text(0.5, 0.915, "(Legend denotes lateral offset between target and receiver)",
+                  horizontalalignment="center")
+        # # ax.set_title("\n\n Legend denotes lateral offset between target and receiver", fontsize=10)
+        plt.legend()
+        plt.xlabel("Distance from target (m)")
+        plt.ylabel("Magnetic Field Intensity [T]")
+        plt.savefig("transects.png")
 
 def _plot_amplitude(ax, v, x, y):
     """
@@ -405,7 +457,15 @@ def test_reference_dipole():
     params = test_experiment_params()
     dipole = DipoleField(experiment_parameters=params)
     dipole.compute_field()
-    dipole.plot_total_field_amplitude(savefig_path="test.png")
+    transect_location_y_indices = [1,7,13,23, 33, 43,44]  # hacky assumes nx=ny=100
+    y_transects = dipole.params.grid_parameters.y_nodes[transect_location_y_indices]
+    dipole.plot_total_field_amplitude(
+        savefig_path="test.png",
+        transects = {"y":y_transects}
+    )
+    dipole.plot_transects(
+        y_indices=transect_location_y_indices
+    )
 
 def main():
     test_target()
