@@ -3,26 +3,28 @@
 
     Note that dipole targets are completely described by three parameters: a.k.a. the dipole-moment vector.
 
-    Of course there are a couple real-world complications that we are skirting here
+    Of course there are a some real-world complications that we are skirting here
     1. the target is only approximatley a dipole
-    2. The targe may have remnent magnetization
-    3. The actual (even approximate dipole moment) for a given target In this case
-    1. magnetic moment
-    2. orienation(note that this will depend on the individual target, the earth magnetic field, and
-         some other
-"""
+    2. The target may have remanent magnetization
 
+
+"""
+import copy
+
+import pandas as pd
 from geoana import utils
 from geoana.em import static
 from loguru import logger
+from location import Location
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from typing import Optional, Union
-
+import discretize
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
+import xarray as xr
 
 matplotlib.use('TkAgg')
 
@@ -37,15 +39,8 @@ DEFAULT_GRID_PARAMETERS = {
     "ny": 100,
 }
 
-class Location():
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
 
-    def __str__(self):
-        tmp = f"Location: {self.x}X {self.y}Y {self.z}Z"
-        return tmp
+
 
 class MagneticDipoleTarget(object):
 
@@ -149,6 +144,10 @@ class ExperimentParameters():
 
 
 class GridParameters():
+    """
+    TODO: replace make_grid with discretize.TensorMesh
+    
+    """
     PARAMETER_NAMES = [
         "x_min", "x_max", "dx", "nx", "y_min", "y_max", "dy", "ny"
     ]
@@ -283,6 +282,45 @@ class GridParameters():
         return xyz
 
 
+class Transect():
+    """
+    Class to hold r(t), a 3-dimensional path, with a time axis bound to it
+    We will use a constant sample_rate.
+    Use xarray
+
+
+    """
+    def __init__(
+            self,
+            x,
+            y,
+            z,
+            time,
+            label: Optional[str] = "",
+            start_point: Optional[Union[Location, np.ndarray, None]] = None,
+            # sample_rate,
+    ):
+        self._start_point = start_point
+        self.label = label
+        self.path = None  # TODO: make this an xarray
+        n_observations = 100
+        data = {
+            "x": x,
+            "y": y,
+            "z": z,
+            "time": time,
+        }
+        df = pd.DataFrame(data=data)
+        df.set_index("time", inplace=True)
+        path = df.to_xarray()
+        self.path = path
+
+    def start_point(self):
+        if self._start_point is None:
+            self._start_point = Location(self.path.x[0], self.path.y[0], self.path.z[0])
+
+
+
 class DipoleField():
     def __init__(
             self,
@@ -330,21 +368,31 @@ class DipoleField():
             self.params.grid_parameters.y_nodes,
         )
         colors = ["blue", "orange", "green", "red", "purple", "pink", "brown"]
+
         if transects is not None:
-            logger.error("TODO: Add transect overlays")
-            try:
-                y_transects = transects["y"]
-            except KeyError:
-                msg = "no y transects found"
-                y_transects = None
-            xlim = ax.get_xlim()
-            for y_transect in y_transects:
-                ax.plot(
-                    np.asarray([xlim[0], xlim[1]]),
-                    np.asarray([y_transect, y_transect]),
-                    label=f"{y_transect:.2f}",
-                    linewidth=2,
-                )
+            if isinstance(transects, dict):
+                logger.warning("OLD Hacky way of adding transect overlays")
+                try:
+                    y_transects = transects["y"]
+                except KeyError:
+                    msg = "no y transects found"
+                    y_transects = None
+                xlim = ax.get_xlim()
+                for y_transect in y_transects:
+                    ax.plot(
+                        np.asarray([xlim[0], xlim[1]]),
+                        np.asarray([y_transect, y_transect]),
+                        label=f"{y_transect:.2f}",
+                        linewidth=2,
+                    )
+            else:
+                for transect in transects:
+                    ax.plot(
+                        transect.path.x,
+                        transect.path.y,
+                        label=f"{transect.label}",
+                        linewidth=2,
+                    )
 
                 #plt.hlines(y_transects, xlim[0], xlim[1], colors=colors, linestyles= )
         #ax[0].set_title("Total field: dipole")
@@ -353,7 +401,12 @@ class DipoleField():
             plt.savefig(savefig_path)
         plt.show()
 
-    def plot_transects(self, x=None, y_indices=None):
+    def plot_transects(
+            self,
+            x = None,
+            y_indices = None,  # TODO: deprecate
+            transects = None,
+    ):
         """
         Tool intended to make a pair of plots.
         1. total field amplitude (with some transects over it)
@@ -365,11 +418,19 @@ class DipoleField():
         """
         fig, ax  = plt.subplots(figsize=(8, 8))
         # fig, ax = plt.subplots(figsize=(8, 6))
-        for y_ind in y_indices:
-            ax.plot(self.params.grid_parameters.x_nodes,
-                    self.b_total[y_ind * 100: (y_ind + 1) * 100],
-                    label=f"{self.params.grid_parameters.y_nodes[y_ind]:.1f}m"
-                    )
+        if y_indices is not None:
+            msg = "Using old hack method for transect definition"
+            logger.warning(msg)
+            for y_ind in y_indices:
+                ax.plot(self.params.grid_parameters.x_nodes,
+                        self.b_total[y_ind * 100: (y_ind + 1) * 100],
+                        label=f"{self.params.grid_parameters.y_nodes[y_ind]:.1f}m"
+                        )
+
+        if transects is not None:
+            for transect in transects:
+                msg = "TODO: Add new transect plotter"
+                logger.error(msg)
         #for n in [0, 7, 13, 23, 33, 43, 44]:
         #     print(x[n], y[n])
         #     ax.plot(y[0:100], b_total_dipole[n * 100: (n + 1) * 100], label=f"{x[n]:.1f}m")
@@ -382,6 +443,7 @@ class DipoleField():
         plt.xlabel("Distance from target (m)")
         plt.ylabel("Magnetic Field Intensity [T]")
         plt.savefig("transects.png")
+        plt.show()
 
 def _plot_amplitude(ax, v, x, y):
     """
@@ -453,12 +515,59 @@ def test_target():
     )
     return target
 
+
+def test_transect(
+        start_point: Optional[Union[Location, np.ndarray, None]] = None,
+
+):
+    """
+
+    :return:
+    """
+    if start_point is None:
+        start_point = Location(
+            x=-36,
+            y=-0.05,
+            z = 0,
+        )
+    end_point = Location(
+        x=36,
+        y=-0.05,
+        z = 0,
+    )
+    # end_point = start_point +np.array([72., 0., 0.])
+    n_observations = 100
+    speed = 1.0
+    t0 = 0
+    
+    total_displacement = (end_point - start_point).to_array()
+    total_distance = np.linalg.norm(total_displacement)
+    # v  = d / t
+    # t = d / v
+    total_time = total_distance / speed
+    time = np.linspace(t0, total_time+t0, n_observations)
+    x = np.linspace(start_point.x, end_point.x, n_observations)
+    y = np.linspace(start_point.y, end_point.y, n_observations)
+    z = np.linspace(start_point.z, end_point.z, n_observations)
+    # an example of a straight line transect
+    
+    transect = Transect(
+        x=x, y=y, z=z, time=time, label= "0.05m"
+    )
+    return transect
+
 def test_reference_dipole():
     params = test_experiment_params()
     dipole = DipoleField(experiment_parameters=params)
     dipole.compute_field()
+
+    # HACKY TRANSECTS
+    # Each transect is a curve r(t) = x(t)i_hat + y(t) j_hat + z(t) k_hat
+    # These are hackaround transects defined by selecting a single index of the y-axis and holding it
+    # constant, fixed z and letting x run.
     transect_location_y_indices = [1,7,13,23, 33, 43,44]  # hacky assumes nx=ny=100
     y_transects = dipole.params.grid_parameters.y_nodes[transect_location_y_indices]
+
     dipole.plot_total_field_amplitude(
         savefig_path="test.png",
         transects = {"y":y_transects}
@@ -466,8 +575,24 @@ def test_reference_dipole():
     dipole.plot_transects(
         y_indices=transect_location_y_indices
     )
+    
+    # LESS HACKY TRANSECTS
+    transect = test_transect()
+    dipole.plot_total_field_amplitude(
+        savefig_path="test.png",
+        transects=[transect, ]
+    )
+
+    print("TODO: Convert transect into a parametric s(t)")
+    # Assuming constant velocity
+    time = dipole.params.grid_parameters.x_nodes  # equivalent to 1m/s
+    x_of_t = dipole.params.grid_parameters.x_nodes
+    y_of_t = y_transects[0]
+    #x_of_t =
+
 
 def main():
+    test_transect()
     test_target()
     test_experiment_params()
     test_grid_parameters()
